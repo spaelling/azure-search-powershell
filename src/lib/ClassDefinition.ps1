@@ -1,13 +1,11 @@
-﻿Clear-Host
-
-class AzureSearch {
+﻿class AzureSearch {
 
     # Property: 
     [String] $Name
     [string] $CurrentIndex;
-    [string] $ApiVersion = '2016-09-01'
+    [string] $ApiVersion = '2015-02-28' # latest? '2016-09-01'
     [string] $ApiKey
-    [Object[]] $Response
+    [Object[]] $_Response
 
     # Constructor: 
     AzureSearch([String] $Name, [string] $IndexName, [string] $ApiKey) {
@@ -31,7 +29,7 @@ class AzureSearch {
         }
 
         $Uri = "https://{0}.search.windows.net/indexes/{1}/docs?api-version={2}&api-key={3}&search=*" -f $this.Name, $this.CurrentIndex, $this.ApiVersion, $this.ApiKey
-        $this.Response = (Invoke-WebRequest -Uri $Uri -UseBasicParsing -Method Get -Headers $Headers | ConvertFrom-Json)."value"
+        $this._Response = (Invoke-WebRequest -Uri $Uri -UseBasicParsing -Method Get -Headers $Headers | ConvertFrom-Json)."value"
         Return $this
         #>
 
@@ -50,15 +48,15 @@ class AzureSearch {
 
         }
 
-        $Uri = "https://{0}.search.windows.net/indexes/{1}/docs?api-version={2}" -f $this.Name, $this.CurrentIndex, $this.ApiVersion
+        $Uri = "https://{0}.search.windows.net/indexes/{1}/docs/search?api-version={2}" -f $this.Name, $this.CurrentIndex, $this.ApiVersion
         try
         {
             Write-Verbose "querying '$Uri'"
-            $this.Response = (Invoke-WebRequest -Uri $Uri -UseBasicParsing -Method Post -Body $Body -Headers $Headers | ConvertFrom-Json)."value"
+            $this._Response = (Invoke-WebRequest -Uri $Uri -UseBasicParsing -Method Post -Body $Body -Headers $Headers | ConvertFrom-Json)."value"
         }
         catch
         {
-            $this.Response = @{Error = "Failed to do search query against '$Uri'. Error was:´n$_"}
+            $this._Response = @{Error = "Failed to do search query against '$Uri'. Error was:´n$_"}
         }
         #>
         Return $this
@@ -68,7 +66,7 @@ class AzureSearch {
     [Object[]] GetResponse() {
 
         #Return ($this.Response | ConvertFrom-Json)."value"
-        Return $this.Response
+        Return $this._Response
     }
 }
 
@@ -84,10 +82,3 @@ function New-AzureSearch
     $AzureSearch = [AzureSearch]::new($Name, $IndexName, $ApiKey)
     $AzureSearch
 }
-
-$AzureSearch = New-AzureSearch -Name 'az42' -IndexName 'realestate-us-sample' -ApiKey 'C8359312BD7BEEDD221214656B234599' -Verbose
-$Response = $AzureSearch.Search().GetResponse()
-
-$Response
-
-$Response[0].Error
