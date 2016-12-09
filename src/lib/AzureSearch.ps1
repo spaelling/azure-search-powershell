@@ -1,12 +1,20 @@
-﻿function Get-AzureSearchIndex
+﻿function Get-AzureSearchIndexFields
 {
     [CmdletBinding()]
     Param(
         [String]   $ServiceName,
         [String]   $IndexName,
-        [string]   $AdminApiKey
+        [string]   $AdminApiKey,
+        [string]   $ApiVersion = '2015-02-28', # latest? '2016-09-01'
+        [switch]   $Searchable,
+        [switch]   $Filterable,
+        [switch]   $Retrieveable,
+        [switch]   $Sortable,
+        [switch]   $Facetable,
+        [switch]   $IsKey
         )
 
+    # https://docs.microsoft.com/en-us/rest/api/searchservice/get-index
         
     $Headers = @{
         'api-key'   = $AdminApiKey
@@ -22,7 +30,38 @@
     {
         Throw "Failed to do get index from '$Uri'. Error was:´n$_"
     }
-    Return $Fields
+
+    $_Fields = @()
+    if($Searchable.IsPresent)
+    {
+        $_Fields += $Fields| Where-Object {$_.searchable}
+    }
+    if($Filterable.IsPresent)
+    {
+        $_Fields += $Fields| Where-Object {$_.filterable}
+    }
+    if($Retrieveable.IsPresent)
+    {
+        $_Fields += $Fields| Where-Object {$_.retrievable}
+    }
+    if($Sortable.IsPresent)
+    {
+        $_Fields += $Fields| Where-Object {$_.sortable}
+    }
+    if($Facetable.IsPresent)
+    {
+        $_Fields += $Fields| Where-Object {$_.facetable}
+    }
+    if($IsKey.IsPresent)
+    {
+        $_Fields += $Fields| Where-Object {$_.key}
+    }
+
+    if($_Fields)
+    {
+        Return $_Fields # | Select-Object -ExpandProperty name
+    }
+    Return $Fields # | Select-Object -ExpandProperty name
 }
 
 function New-AzureSearch
@@ -33,6 +72,7 @@ function New-AzureSearch
         [String]   $IndexName,
         [string]   $ApiKey,
         [string]   $AdminApiKey = '',
+        [ValidateSet('2015-02-28')]
         [string]   $ApiVersion = '2015-02-28', # latest? '2016-09-01'
         [string]   $Search = '*',
         [int]      $Take = 50,
@@ -46,7 +86,9 @@ function New-AzureSearch
 
     if($AdminApiKey)
     {
-        $Fields = Get-AzureSearchIndex -ServiceName $ServiceName -IndexName $IndexName -AdminApiKey $AdminApiKey
+        $Fields = Get-AzureSearchIndexFields -ServiceName $ServiceName -IndexName $IndexName -AdminApiKey $AdminApiKey
+        #$SortableFields = Get-AzureSearchIndexFields -ServiceName $ServiceName -IndexName $IndexName -AdminApiKey $AdminApiKey -Sortable
+        #$FilterableFields = Get-AzureSearchIndexFields -ServiceName $ServiceName -IndexName $IndexName -AdminApiKey $AdminApiKey -Filterable
         $SortableFields   = $Fields | Where-Object {$_.sortable} | Select-Object -ExpandProperty name
         $FilterableFields = $Fields | Where-Object {$_.filterable} | Select-Object -ExpandProperty name
     }
@@ -63,7 +105,7 @@ function New-AzureSearch
     }
 
     # Test is sortable fields
-    if($Fields -and $OrderBy)
+    if($SortableFields -and $OrderBy)
     {
         $NonSortableFields = $OrderBy | Where-Object {$_ -notin $SortableFields}
         if($NonSortableFields)
@@ -78,7 +120,7 @@ function New-AzureSearch
     }
 
     # Test is filterable fields. 
-    if($Fields -and $Filter)
+    if($FilterableFields -and $Filter)
     {
         # need to extract fields from $Filter # TODO: must be some library to do this
         # remove any operators
